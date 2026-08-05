@@ -5,8 +5,8 @@
 WITH agg AS (
     SELECT
         event_type            AS event_type,
-        repo_name              AS repo_name,
-        count(*)                AS event_count
+        repo_name             AS repo_name,
+        count(*)              AS event_count
     FROM {{ ref('stg_events') }}
     GROUP BY event_type, repo_name
 )

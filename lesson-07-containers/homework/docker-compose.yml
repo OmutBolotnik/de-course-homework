@@ -29,5 +29,20 @@ services:
       timeout: 5s
       retries: 10
 
+  ingestor:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      ARCHIVE_URL: ${ARCHIVE_URL}
+    volumes:
+      - cache:/cache
+
 volumes:
   pg_data:
+  cache:

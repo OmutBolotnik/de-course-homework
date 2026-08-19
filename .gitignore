@@ -10,13 +10,10 @@ wheels/
 
 # Virtual environments
 .venv
-<<<<<<< HEAD
-.env
-=======
->>>>>>> d2970a92cd23e71534aba3ab6221ca779713d724
 
 # Local secrets (.env.example stays tracked)
 .env
+!lesson-07-containers/homework/.env
 
 .obsidian/
 .vscode/

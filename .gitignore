@@ -15,6 +15,9 @@ wheels/
 =======
 >>>>>>> d2970a92cd23e71534aba3ab6221ca779713d724
 
+# Local secrets (.env.example stays tracked)
+.env
+
 .obsidian/
 .vscode/
 .DS_Store

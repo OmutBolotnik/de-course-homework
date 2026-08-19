@@ -29,7 +29,9 @@ class GHArchiveSensor(BaseSensorOperator):
     def poke(self, context) -> bool:
         ds = context["ds"]
         url = f"https://data.gharchive.org/{ds}-{self.hour:02d}.json.gz"
-        req = urllib.request.Request(url, method="HEAD")
+        req = urllib.request.Request(
+            url, method="HEAD", headers={"User-Agent": "gh-etl/1.0"}
+        )
         try:
             with urllib.request.urlopen(req) as resp:
                 self.log.info("HEAD %s -> %s", url, resp.status)

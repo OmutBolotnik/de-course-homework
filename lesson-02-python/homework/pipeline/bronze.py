@@ -44,6 +44,5 @@ def build_bronze() -> pl.DataFrame:
         .alias("commit_count"),
     ).collect()
 
-    os.makedirs(os.path.dirname(config.BRONZE_FILE), exist_ok=True)
-    bronze.write_parquet(config.BRONZE_FILE)
+    bronze.write_parquet(config.BRONZE_FILE, mkdir=True)
     return bronze

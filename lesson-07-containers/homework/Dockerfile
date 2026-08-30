@@ -13,4 +13,21 @@
 # Перевірте збірку:  docker build -t gh-ingest:latest .
 # Скрипт app/gh_ingest.py — ДАНО, не редагуйте його.
 
-# TODO: реалізуйте Dockerfile тут.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1
+
+RUN useradd --uid 1000 --create-home appuser \
+    && mkdir -p /cache \
+    && chown appuser:appuser /cache
+
+WORKDIR /app
+
+COPY app/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app/ ./app
+
+USER appuser
+
+ENTRYPOINT ["python", "app/gh_ingest.py"]

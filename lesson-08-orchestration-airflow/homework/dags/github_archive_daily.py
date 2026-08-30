@@ -3,7 +3,6 @@
 Готові ETL-цеглинки вже є — імпортуйте і викликайте їх у задачах (не переписуйте):
 
     from include.gh_etl import download, validate, load_to_duckdb, summarize
-    from gh_sensor import GHArchiveSensor   # ваш custom sensor із plugins/
 
 Що треба зібрати (деталі й бали — у SPEC.md):
   * DAG `github_archive_daily`, розклад «щодня о 06:00 UTC», catchup=False;
@@ -24,11 +23,14 @@
 from __future__ import annotations
 
 import datetime
+import logging
 
 from airflow.decorators import dag, task
 
-from gh_sensor import GHArchiveSensor
+from gh_sensor import gh_archive_sensor
 from include import gh_etl
+
+log = logging.getLogger(__name__)
 
 DB_PATH = "/opt/airflow/data/github_analytics.duckdb"
 LANDING_DIR = "/opt/airflow/data/landing"
@@ -42,12 +44,8 @@ LANDING_DIR = "/opt/airflow/data/landing"
     tags=["github", "archive", "daily"],
 )
 def github_archive_daily():
-    check_availability = GHArchiveSensor(
-        task_id="check_availability",
-        hour=14,
-        timeout=600,
-        poke_interval=60,
-        mode="reschedule",
+    check_availability = gh_archive_sensor.override(task_id="check_availability")(
+        hour=14
     )
 
     @task
@@ -66,7 +64,7 @@ def github_archive_daily():
     @task
     def notify_completion(rows: int, ds: str) -> None:
         summary = gh_etl.summarize(ds, DB_PATH)
-        print(f"[notify] ds={ds} rows={rows} summary={summary}")
+        log.info("[notify] ds=%s rows=%s summary=%s", ds, rows, summary)
 
     downloaded_path = download_archive()
     validated_path = validate_file(downloaded_path)

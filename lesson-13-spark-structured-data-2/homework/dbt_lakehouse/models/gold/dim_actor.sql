@@ -4,12 +4,14 @@
 --          first_seen_at, last_seen_at, event_count, distinct_repos.
 
 -- TODO: замініть заглушку на запит згідно зі SPEC.md
-select
-    cast(null as string)    as actor_id,
-    cast(null as string)    as actor_login,
-    cast(null as boolean)   as is_bot,
-    cast(null as timestamp) as first_seen_at,
-    cast(null as timestamp) as last_seen_at,
-    cast(null as bigint)    as event_count,
-    cast(null as bigint)    as distinct_repos
-where false
+SELECT
+    md5(actor_login)                                    AS actor_id,
+    actor_login,
+    actor_login LIKE '%[bot]'                            AS is_bot,
+    min(created_at)                                      AS first_seen_at,
+    max(created_at)                                      AS last_seen_at,
+    count(*)                                              AS event_count,
+    count(DISTINCT repo_name)                             AS distinct_repos
+FROM {{ ref('events') }}
+WHERE actor_login IS NOT NULL
+GROUP BY actor_login

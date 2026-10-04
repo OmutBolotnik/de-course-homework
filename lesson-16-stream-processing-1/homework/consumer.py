@@ -29,18 +29,39 @@ def top_repos(by_repo: dict, n: int = 5) -> list:
 
 
 def run_consumer() -> dict:
-    """Завдання 6 (20 балів).
+    consumer = Consumer(
+        {
+            "bootstrap.servers": BOOTSTRAP_SERVERS,
+            "group.id": GROUP_ID,
+            "auto.offset.reset": "earliest",
+        }
+    )
+    consumer.subscribe([TOPIC])
 
-    1. Створіть Consumer (bootstrap.servers=BOOTSTRAP_SERVERS, group.id=GROUP_ID,
-       auto.offset.reset="earliest") і підпишіться на TOPIC.
-    2. У циклі poll(1.0): пропускайте None та msg.error(); інакше
-       json.loads(msg.value()) і update_counts(...). Рахуйте total.
-    3. Зупиніться, коли топік мовчить IDLE_LIMIT_SECONDS поспіль. consumer.close().
-    4. Зберіть stats = {"total", "by_type", "top_repos": top_repos(by_repo, 5)}
-       і запишіть його JSON у OUTPUT_PATH (створіть каталог через os.makedirs).
-       Поверніть stats.
-    """
-    raise NotImplementedError("Реалізуйте run_consumer")
+    by_type: dict = {}
+    by_repo: dict = {}
+    total = 0
+    last_message_at = time.monotonic()
+    try:
+        while time.monotonic() - last_message_at < IDLE_LIMIT_SECONDS:
+            msg = consumer.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            update_counts(by_type, by_repo, json.loads(msg.value()))
+            total += 1
+            last_message_at = time.monotonic()
+    finally:
+        consumer.close()
+
+    stats = {
+        "total": total,
+        "by_type": by_type,
+        "top_repos": top_repos(by_repo, 5),
+    }
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    with open(OUTPUT_PATH, "w") as f:
+        json.dump(stats, f, indent=2)
+    return stats
 
 
 if __name__ == "__main__":

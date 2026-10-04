@@ -75,8 +75,7 @@ def read_stream(spark: SparkSession) -> DataFrame:
     Завдання 2 (13 балів). Поверніть потоковий DataFrame: readStream із json-source
     над каталогом LANDING зі схемою event_schema(). Перевірка: df.isStreaming == True.
     """
-    # TODO: spark.readStream.schema(...).json(LANDING)
-    raise NotImplementedError
+    return spark.readStream.schema(event_schema()).json(LANDING)
 
 
 def clean_events(stream_df: DataFrame) -> DataFrame:
@@ -87,8 +86,15 @@ def clean_events(stream_df: DataFrame) -> DataFrame:
       - залиште рівно колонки: id, event_type (=type), event_time,
         actor_login (=actor.login), repo_name (=repo.name).
     """
-    # TODO
-    raise NotImplementedError
+    return stream_df.filter(
+        F.col("type").isin(KEEP_TYPES) & (F.col("public") == F.lit(True))
+    ).select(
+        F.col("id"),
+        F.col("type").alias("event_type"),
+        F.to_timestamp("created_at").alias("event_time"),
+        F.col("actor.login").alias("actor_login"),
+        F.col("repo.name").alias("repo_name"),
+    )
 
 
 def windowed_counts(clean_df: DataFrame) -> DataFrame:

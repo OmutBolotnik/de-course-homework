@@ -150,8 +150,30 @@ def build_summary(spark: SparkSession) -> dict:
       {"total_events": int, "n_windows": int, "window_seconds": 30, "by_type": {type: int}}
     Запишіть його у SUMMARY (json, indent=2, sort_keys=True) і поверніть як dict.
     """
-    # TODO
-    raise NotImplementedError
+    windows = spark.read.parquet(OUTPUT)
+    totals = windows.agg(
+        F.sum("event_count").alias("total_events"),
+        F.countDistinct("window_start").alias("n_windows"),
+        F.max(
+            F.col("window_end").cast("long") - F.col("window_start").cast("long")
+        ).alias("window_seconds"),
+    ).first()
+    by_type = {
+        row["event_type"]: int(row["total"])
+        for row in windows.groupBy("event_type")
+        .agg(F.sum("event_count").alias("total"))
+        .collect()
+    }
+    summary = {
+        "total_events": int(totals["total_events"]),
+        "n_windows": int(totals["n_windows"]),
+        "window_seconds": int(totals["window_seconds"]),
+        "by_type": by_type,
+    }
+    os.makedirs(os.path.dirname(SUMMARY), exist_ok=True)
+    with open(SUMMARY, "w") as f:
+        json.dump(summary, f, indent=2, sort_keys=True)
+    return summary
 
 
 def main() -> None:

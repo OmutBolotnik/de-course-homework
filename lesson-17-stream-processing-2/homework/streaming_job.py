@@ -104,8 +104,11 @@ def windowed_counts(clean_df: DataFrame) -> DataFrame:
     window(event_time, WINDOW) та event_type і порахуйте count().
     Поверніть DataFrame з колонками window (struct start/end), event_type, count.
     """
-    # TODO
-    raise NotImplementedError
+    return (
+        clean_df.withWatermark("event_time", WATERMARK)
+        .groupBy(F.window("event_time", WINDOW), F.col("event_type"))
+        .count()
+    )
 
 
 def write_windows(spark: SparkSession) -> None:
@@ -124,11 +127,21 @@ def write_windows(spark: SparkSession) -> None:
     clean = clean_events(read_stream(spark))
 
     def upsert_batch(batch_df: DataFrame, batch_id: int) -> None:
-        # TODO: agg = windowed_counts(batch_df); select 4 колонки; write append parquet -> OUTPUT
-        raise NotImplementedError
+        agg = windowed_counts(batch_df).select(
+            F.col("window.start").alias("window_start"),
+            F.col("window.end").alias("window_end"),
+            F.col("event_type"),
+            F.col("count").alias("event_count"),
+        )
+        agg.write.mode("append").parquet(OUTPUT)
 
-    # TODO: clean.writeStream.foreachBatch(upsert_batch).option(...).trigger(...).start() та awaitTermination()
-    raise NotImplementedError
+    query = (
+        clean.writeStream.foreachBatch(upsert_batch)
+        .option("checkpointLocation", CHECKPOINT)
+        .trigger(availableNow=True)
+        .start()
+    )
+    query.awaitTermination()
 
 
 def build_summary(spark: SparkSession) -> dict:

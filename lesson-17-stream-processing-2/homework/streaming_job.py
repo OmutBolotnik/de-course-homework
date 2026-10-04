@@ -58,8 +58,16 @@ def event_schema() -> StructType:
     для подій gharchive. Потрібні поля: id (str), type (str), created_at (str),
     public (bool), вкладені actor.login (str), repo.name (str).
     """
-    # TODO: повернути StructType([...]) із вкладеними actor/repo
-    raise NotImplementedError
+    return StructType(
+        [
+            StructField("id", StringType()),
+            StructField("type", StringType()),
+            StructField("created_at", StringType()),
+            StructField("public", BooleanType()),
+            StructField("actor", StructType([StructField("login", StringType())])),
+            StructField("repo", StructType([StructField("name", StringType())])),
+        ]
+    )
 
 
 def read_stream(spark: SparkSession) -> DataFrame:

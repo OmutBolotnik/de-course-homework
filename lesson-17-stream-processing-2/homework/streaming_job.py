@@ -58,8 +58,16 @@ def event_schema() -> StructType:
     для подій gharchive. Потрібні поля: id (str), type (str), created_at (str),
     public (bool), вкладені actor.login (str), repo.name (str).
     """
-    # TODO: повернути StructType([...]) із вкладеними actor/repo
-    raise NotImplementedError
+    return StructType(
+        [
+            StructField("id", StringType()),
+            StructField("type", StringType()),
+            StructField("created_at", StringType()),
+            StructField("public", BooleanType()),
+            StructField("actor", StructType([StructField("login", StringType())])),
+            StructField("repo", StructType([StructField("name", StringType())])),
+        ]
+    )
 
 
 def read_stream(spark: SparkSession) -> DataFrame:
@@ -67,8 +75,7 @@ def read_stream(spark: SparkSession) -> DataFrame:
     Завдання 2 (13 балів). Поверніть потоковий DataFrame: readStream із json-source
     над каталогом LANDING зі схемою event_schema(). Перевірка: df.isStreaming == True.
     """
-    # TODO: spark.readStream.schema(...).json(LANDING)
-    raise NotImplementedError
+    return spark.readStream.schema(event_schema()).json(LANDING)
 
 
 def clean_events(stream_df: DataFrame) -> DataFrame:
@@ -79,8 +86,15 @@ def clean_events(stream_df: DataFrame) -> DataFrame:
       - залиште рівно колонки: id, event_type (=type), event_time,
         actor_login (=actor.login), repo_name (=repo.name).
     """
-    # TODO
-    raise NotImplementedError
+    return stream_df.filter(
+        F.col("type").isin(KEEP_TYPES) & (F.col("public") == F.lit(True))
+    ).select(
+        F.col("id"),
+        F.col("type").alias("event_type"),
+        F.to_timestamp("created_at").alias("event_time"),
+        F.col("actor.login").alias("actor_login"),
+        F.col("repo.name").alias("repo_name"),
+    )
 
 
 def windowed_counts(clean_df: DataFrame) -> DataFrame:
@@ -90,8 +104,11 @@ def windowed_counts(clean_df: DataFrame) -> DataFrame:
     window(event_time, WINDOW) та event_type і порахуйте count().
     Поверніть DataFrame з колонками window (struct start/end), event_type, count.
     """
-    # TODO
-    raise NotImplementedError
+    return (
+        clean_df.withWatermark("event_time", WATERMARK)
+        .groupBy(F.window("event_time", WINDOW), F.col("event_type"))
+        .count()
+    )
 
 
 def write_windows(spark: SparkSession) -> None:
@@ -110,11 +127,21 @@ def write_windows(spark: SparkSession) -> None:
     clean = clean_events(read_stream(spark))
 
     def upsert_batch(batch_df: DataFrame, batch_id: int) -> None:
-        # TODO: agg = windowed_counts(batch_df); select 4 колонки; write append parquet -> OUTPUT
-        raise NotImplementedError
+        agg = windowed_counts(batch_df).select(
+            F.col("window.start").alias("window_start"),
+            F.col("window.end").alias("window_end"),
+            F.col("event_type"),
+            F.col("count").alias("event_count"),
+        )
+        agg.write.mode("append").parquet(OUTPUT)
 
-    # TODO: clean.writeStream.foreachBatch(upsert_batch).option(...).trigger(...).start() та awaitTermination()
-    raise NotImplementedError
+    query = (
+        clean.writeStream.foreachBatch(upsert_batch)
+        .option("checkpointLocation", CHECKPOINT)
+        .trigger(availableNow=True)
+        .start()
+    )
+    query.awaitTermination()
 
 
 def build_summary(spark: SparkSession) -> dict:
@@ -123,8 +150,30 @@ def build_summary(spark: SparkSession) -> dict:
       {"total_events": int, "n_windows": int, "window_seconds": 30, "by_type": {type: int}}
     Запишіть його у SUMMARY (json, indent=2, sort_keys=True) і поверніть як dict.
     """
-    # TODO
-    raise NotImplementedError
+    windows = spark.read.parquet(OUTPUT)
+    totals = windows.agg(
+        F.sum("event_count").alias("total_events"),
+        F.countDistinct("window_start").alias("n_windows"),
+        F.max(
+            F.col("window_end").cast("long") - F.col("window_start").cast("long")
+        ).alias("window_seconds"),
+    ).first()
+    by_type = {
+        row["event_type"]: int(row["total"])
+        for row in windows.groupBy("event_type")
+        .agg(F.sum("event_count").alias("total"))
+        .collect()
+    }
+    summary = {
+        "total_events": int(totals["total_events"]),
+        "n_windows": int(totals["n_windows"]),
+        "window_seconds": int(totals["window_seconds"]),
+        "by_type": by_type,
+    }
+    os.makedirs(os.path.dirname(SUMMARY), exist_ok=True)
+    with open(SUMMARY, "w") as f:
+        json.dump(summary, f, indent=2, sort_keys=True)
+    return summary
 
 
 def main() -> None:

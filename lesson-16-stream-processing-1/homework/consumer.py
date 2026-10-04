@@ -2,6 +2,7 @@
 # Запуск із цієї директорії (homework/):  uv run python consumer.py
 import json
 import os
+import time
 
 from confluent_kafka import Consumer
 from icecream import ic
@@ -16,24 +17,15 @@ IDLE_LIMIT_SECONDS = 5.0  # зупинитись, коли топік мовчи
 
 
 def update_counts(by_type: dict, by_repo: dict, event: dict) -> None:
-    """Завдання 4 (15 балів).
-
-    Додайте одну подію до бігучих агрегатів (мутуйте обидва словники на місці):
-      by_type[event_type] += 1
-      by_repo[repo_name]  += 1
-    Ключі, яких ще немає, починаються з 0.
-    """
-    raise NotImplementedError("Реалізуйте update_counts")
+    event_type = event["event_type"]
+    repo_name = event["repo_name"]
+    by_type[event_type] = by_type.get(event_type, 0) + 1
+    by_repo[repo_name] = by_repo.get(repo_name, 0) + 1
 
 
 def top_repos(by_repo: dict, n: int = 5) -> list:
-    """Завдання 5 (10 балів).
-
-    Поверніть n найактивніших репозиторіїв як список пар [name, count],
-    від найбільшого до найменшого. Однакові лічильники впорядкуйте за іменем
-    репозиторію (щоб результат був детермінованим).
-    """
-    raise NotImplementedError("Реалізуйте top_repos")
+    ranked = sorted(by_repo.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [[name, count] for name, count in ranked[:n]]
 
 
 def run_consumer() -> dict:

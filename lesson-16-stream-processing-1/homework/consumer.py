@@ -4,7 +4,7 @@ import json
 import os
 import time
 
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer, KafkaException
 from icecream import ic
 
 # Дано, не редагувати.
@@ -34,34 +34,54 @@ def run_consumer() -> dict:
             "bootstrap.servers": BOOTSTRAP_SERVERS,
             "group.id": GROUP_ID,
             "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
         }
     )
-    consumer.subscribe([TOPIC])
+    last_activity = None
+
+    def on_assign(_consumer, _partitions):
+        nonlocal last_activity
+        last_activity = time.monotonic()
+
+    consumer.subscribe([TOPIC], on_assign=on_assign)
 
     by_type: dict = {}
     by_repo: dict = {}
     total = 0
-    last_message_at = time.monotonic()
     try:
-        while time.monotonic() - last_message_at < IDLE_LIMIT_SECONDS:
+        while last_activity is None or time.monotonic() - last_activity < IDLE_LIMIT_SECONDS:
             msg = consumer.poll(1.0)
-            if msg is None or msg.error():
+            if msg is None:
                 continue
-            update_counts(by_type, by_repo, json.loads(msg.value()))
+            err = msg.error()
+            if err:
+                if err.fatal():
+                    raise KafkaException(err)
+                ic(err)
+                continue
+            last_activity = time.monotonic()
+            try:
+                update_counts(by_type, by_repo, json.loads(msg.value()))
+            except (ValueError, KeyError, TypeError) as exc:
+                ic(msg.partition(), msg.offset(), exc)
+                continue
             total += 1
-            last_message_at = time.monotonic()
+
+        stats = {
+            "total": total,
+            "by_type": by_type,
+            "top_repos": top_repos(by_repo, 5),
+        }
+        os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+        tmp_path = OUTPUT_PATH + ".tmp"
+        with open(tmp_path, "w") as f:
+            json.dump(stats, f, indent=2)
+        os.replace(tmp_path, OUTPUT_PATH)
+        if total:
+            consumer.commit(asynchronous=False)
+        return stats
     finally:
         consumer.close()
-
-    stats = {
-        "total": total,
-        "by_type": by_type,
-        "top_repos": top_repos(by_repo, 5),
-    }
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
-    with open(OUTPUT_PATH, "w") as f:
-        json.dump(stats, f, indent=2)
-    return stats
 
 
 if __name__ == "__main__":

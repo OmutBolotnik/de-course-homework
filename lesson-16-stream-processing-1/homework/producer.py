@@ -48,19 +48,34 @@ def build_producer() -> Producer:
 
 def run_producer() -> int:
     producer = build_producer()
+    delivery_errors = []
+
+    def on_delivery(err, _msg):
+        if err is not None:
+            delivery_errors.append(err)
+
     sent = 0
     for event in iter_archive(ARCHIVE_URL, MAX_RAW):
         if not event_filter(event):
             continue
         record = flatten_event(event)
-        producer.produce(
-            TOPIC,
-            key=record["repo_name"].encode("utf-8"),
-            value=json.dumps(record).encode("utf-8"),
-        )
+        key = record["repo_name"].encode("utf-8")
+        value = json.dumps(record).encode("utf-8")
+        while True:
+            try:
+                producer.produce(TOPIC, key=key, value=value, on_delivery=on_delivery)
+                break
+            except BufferError:
+                producer.poll(1)
         producer.poll(0)
         sent += 1
-    producer.flush(30)
+
+    undelivered = producer.flush(30)
+    if undelivered or delivery_errors:
+        raise RuntimeError(
+            f"delivery failed: {len(delivery_errors)} errors, "
+            f"{undelivered} still queued, {sent} produced"
+        )
     return sent
 
 

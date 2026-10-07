@@ -10,8 +10,12 @@ WITH accepted AS (
         (payload #>> '{driver,rating}')::numeric    AS rating,
         payload #>> '{driver,vehicle,type}'         AS vehicle_type,
         payload #>> '{driver,vehicle,medallion}'    AS medallion,
-        occurred_at,
-        max(occurred_at) OVER (PARTITION BY payload #>> '{driver,id}') AS last_occurred_at
+        -- Нічия за occurred_at розв'язується за event_id — так само, як у моделі; інакше дві події
+        -- з однаковим часом дали б два «очікувані» рядки й хибне падіння.
+        row_number() OVER (
+            PARTITION BY payload #>> '{driver,id}'
+            ORDER BY occurred_at DESC, event_id DESC
+        ) AS rn
     FROM {{ ref('events') }}
     WHERE event_type = 'ride_accepted'
 ),
@@ -19,7 +23,7 @@ WITH accepted AS (
 expected AS (
     SELECT driver_key, rating, vehicle_type, medallion
     FROM accepted
-    WHERE occurred_at = last_occurred_at
+    WHERE rn = 1
 ),
 
 actual AS (

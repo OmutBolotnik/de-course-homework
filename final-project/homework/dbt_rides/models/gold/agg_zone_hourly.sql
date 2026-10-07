@@ -12,6 +12,8 @@
         materialized='incremental',
         unique_key='requested_hour',
         incremental_strategy='delete+insert',
+        -- Унікальний індекс на справжній grain: і гарантія, і пошук за requested_hour (ведуча колонка).
+        indexes=[{'columns': ['requested_hour', 'pickup_zone_key'], 'unique': True}],
     )
 }}
 

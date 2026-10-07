@@ -10,6 +10,10 @@
         materialized='incremental',
         unique_key='ride_id',
         incremental_strategy='delete+insert',
+        indexes=[
+            {'columns': ['ride_id'], 'unique': True},
+            {'columns': ['_ingested_at']},
+        ],
     )
 }}
 

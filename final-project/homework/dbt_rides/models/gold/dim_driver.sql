@@ -8,6 +8,7 @@
         materialized='incremental',
         unique_key='driver_key',
         incremental_strategy='delete+insert',
+        indexes=[{'columns': ['driver_key'], 'unique': True}],
     )
 }}
 
@@ -73,11 +74,10 @@ SELECT
 FROM latest
 JOIN seen USING (driver_key)
 
-{% if not is_incremental() %}
 UNION ALL
 
--- Член 'unknown' — лише при побудові з нуля: delete+insert його більше не чіпає, тож він рівно
--- один після будь-якої кількості запусків, а повтор без нових даних нічого не змінює.
+-- Член 'unknown' — лише якщо його ще нема: рівно один після будь-якої кількості запусків, повтор
+-- його не перевставляє (і `_loaded_at` не змінює), а зниклий — повертається сам.
 -- _ingested_at = NULL: max() його ігнорує, тож watermark він не піднімає.
 SELECT
     'unknown',
@@ -88,4 +88,6 @@ SELECT
     NULL::timestamptz,
     NULL::timestamptz,
     '{{ run_started_at }}'::timestamptz
+{% if is_incremental() %}
+WHERE NOT EXISTS (SELECT 1 FROM {{ this }} WHERE driver_key = 'unknown')
 {% endif %}

@@ -44,13 +44,17 @@ with DAG(
         bash_command=f"cd {PROJECT} && python bronze_job.py",
     )
 
+    # cautious — у всіх dbt-кроках: тест, у якого parent з іншого шару, у цьому кроці не біжить
+    # (він — у reconcile), замість того щоб падати на ще не перебудованому шарі. Тут це критично:
+    # з типовим eager `--select source:bronze` підхопив би assert_bronze_silver_reconcile, а на
+    # першому запуску silver.events ще нема -> Database Error.
     bronze_contract = BashOperator(
         task_id="bronze_contract",
-        bash_command=f"{DBT} test --select source:bronze {DBT_DIRS}",
+        bash_command=(
+            f"{DBT} test --select source:bronze --indirect-selection cautious {DBT_DIRS}"
+        ),
     )
 
-    # cautious: тест, у якого parent з іншого шару, у цьому кроці не біжить (він — у reconcile),
-    # замість того щоб падати на ще не перебудованому шарі.
     silver = BashOperator(
         task_id="silver",
         bash_command=f"{DBT} build --selector silver --indirect-selection cautious {DBT_DIRS}",

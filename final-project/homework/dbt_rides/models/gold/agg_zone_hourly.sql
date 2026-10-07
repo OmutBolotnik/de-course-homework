@@ -6,13 +6,13 @@
 -- незмінна, а зона посадки — ні: запізнілий ride_started переносить поїздку в іншу зону. Тоді
 -- delete+insert за (година, зона) оновив би нову зону, а стара лишилась би із застарілим лічильником.
 -- Ключ-година видаляє всі рядки зачепленої години й вставляє її заново, перераховану цілком.
--- Унікальність grain (година, зона) перевіряє assert_agg_grain_unique.
+-- Унікальність grain (година, зона) перевіряє assert_agg_grain_unique, а гарантує унікальний
+-- індекс на (requested_hour, pickup_zone_key) — він же й для пошуку за requested_hour (ведуча колонка).
 {{
     config(
         materialized='incremental',
         unique_key='requested_hour',
         incremental_strategy='delete+insert',
-        -- Унікальний індекс на справжній grain: і гарантія, і пошук за requested_hour (ведуча колонка).
         indexes=[{'columns': ['requested_hour', 'pickup_zone_key'], 'unique': True}],
     )
 }}

@@ -84,19 +84,19 @@ def write_batch(
         items.sort(key=lambda item: item[0])
         path = landing_path(base, ingested_at, partition, items[0][0], items[-1][0])
         path.parent.mkdir(parents=True, exist_ok=True)
-        # .tmp у тій самій директорії: os.replace атомарний лише в межах однієї файлової системи.
         tmp = path.with_name(path.name + ".tmp")
         try:
             with tmp.open("wb") as f:
                 for _, value in items:
-                    f.write(value.rstrip(b"\n") + b"\n")
+                    # Сирий \n / \r у валідному JSON — лише пробільний символ між токенами
+                    # (у рядках він екранований), тож один об'єкт = один рядок без зміни змісту.
+                    f.write(b" ".join(value.splitlines()) + b"\n")
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, path)
         except BaseException:
             tmp.unlink(missing_ok=True)
             raise
-        # fsync директорії: щоб сам rename пережив падіння ОС, а не лише вміст файлу.
         dir_fd = os.open(path.parent, os.O_RDONLY)
         try:
             os.fsync(dir_fd)
@@ -137,7 +137,9 @@ def main() -> None:
             batch_started = time.monotonic()
             return
         # Порядок «запис -> commit» — це те, що не дає втрачати повідомлення: падіння між ними
-        # дасть дублікати (батч перечитається й перезапишеться під тим самим іменем), але не втрати.
+        # дасть дублікати, але не втрати. Ім'я файлу після повтору може відрізнятися (інша
+        # `hour=`, інша межа батча) — тоді Bronze завантажить ці події ще раз, а прибере їх
+        # дедуплікація в Silver.
         files = write_batch(config.LANDING_DIR, datetime.now(UTC), batch)
         consumer.commit(asynchronous=False)
         total += len(batch)

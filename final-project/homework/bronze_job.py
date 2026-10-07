@@ -37,7 +37,8 @@ EVENT_SCHEMA = StructType(
 )
 
 # Хвіст шляху `dt=…/hour=…/part-….ndjson`: ключ однаковий на ноутбуці й у контейнері.
-_RELATIVE_PATH = r"(dt=[^/]+/hour=[^/]+/[^/]+\.ndjson)$"
+# Суворо за контрактом імені landing-файлу (SPEC.md, 2.2): чужий файл не має отримати ключ `""`.
+_RELATIVE_PATH = r"(dt=\d{4}-\d{2}-\d{2}/hour=\d{2}/part-p\d+-o\d{12}-o\d{12}\.ndjson)$"
 
 
 def read_landing(spark: SparkSession, landing_dir: str) -> DataFrame:
@@ -56,6 +57,14 @@ def read_landing(spark: SparkSession, landing_dir: str) -> DataFrame:
         .option("pathGlobFilter", "*.ndjson")
         .json(landing_dir)
     )
+    file_path = F.col("_metadata.file_path")
+    relative = F.regexp_extract(file_path, _RELATIVE_PATH, 1)
+    # Без цього файл поза контрактом отримав би `_source_file = ''`, а всі наступні такі файли
+    # вважалися б уже завантаженими й тихо губилися. Краще впасти до запису.
+    source_file = F.when(
+        relative == "",
+        F.raise_error(F.concat(F.lit("landing: файл поза контрактом імені: "), file_path)),
+    ).otherwise(relative)
     return raw.select(
         "event_id",
         "event_type",
@@ -63,7 +72,7 @@ def read_landing(spark: SparkSession, landing_dir: str) -> DataFrame:
         F.to_timestamp("occurred_at").alias("occurred_at"),
         "source",
         "payload",
-        F.regexp_extract(F.col("_metadata.file_path"), _RELATIVE_PATH, 1).alias("_source_file"),
+        source_file.alias("_source_file"),
         F.current_timestamp().alias("_ingested_at"),
     )
 

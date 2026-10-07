@@ -52,9 +52,8 @@ def read_landing(spark: SparkSession, landing_dir: str) -> DataFrame:
     """
     raw = (
         spark.read.schema(EVENT_SCHEMA)
-        # recursiveFileLookup вимикає partition discovery: dt/hour не стають колонками.
         .option("recursiveFileLookup", "true")
-        .option("pathGlobFilter", "*.ndjson")  # *.ndjson.tmp — in-flight файли consumer-а
+        .option("pathGlobFilter", "*.ndjson")
         .json(landing_dir)
     )
     return raw.select(
@@ -64,7 +63,6 @@ def read_landing(spark: SparkSession, landing_dir: str) -> DataFrame:
         F.to_timestamp("occurred_at").alias("occurred_at"),
         "source",
         "payload",
-        # _metadata.file_path — абсолютний URI (`file:/…/landing/dt=…`), лишаємо відносний хвіст.
         F.regexp_extract(F.col("_metadata.file_path"), _RELATIVE_PATH, 1).alias("_source_file"),
         F.current_timestamp().alias("_ingested_at"),
     )
@@ -82,7 +80,9 @@ def select_new(df: DataFrame, already_loaded: set[str]) -> DataFrame:
 
     TODO (5): відфільтруйте за `_source_file`. Порожній `already_loaded` — це перший запуск.
     """
-    raise NotImplementedError("TODO (5): select_new")
+    if not already_loaded:
+        return df
+    return df.filter(~F.col("_source_file").isin(sorted(already_loaded)))
 
 
 def write_bronze(df: DataFrame) -> None:
@@ -92,7 +92,13 @@ def write_bronze(df: DataFrame) -> None:
     Вимога — «або все, або нічого»: збій посеред запису не лишає в таблиці частини батча.
     Подумайте, скільки транзакцій відкриває Spark при JDBC-записі й від чого це залежить.
     """
-    raise NotImplementedError("TODO (6): write_bronze")
+    # Spark JDBC відкриває одну транзакцію на партицію DataFrame: одна партиція — одна транзакція.
+    df.coalesce(1).write.jdbc(
+        config.JDBC_URL,
+        config.BRONZE_TABLE,
+        mode="append",
+        properties=config.JDBC_PROPERTIES,
+    )
 
 
 def main() -> None:

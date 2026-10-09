@@ -1,0 +1,193 @@
+
+$ uv run python -m scripts.reset_warehouse
+склад скинуто: bronze порожній, silver / gold / reference видалено
+
+$ ./dbt.sh seed
+17:20:19  Running with dbt=1.10.23
+17:20:19  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions
+17:20:20  Registered adapter: postgres=1.10.2
+17:20:20  Unable to do partial parsing because an error occurred. Switching to full reparse.
+17:20:21  Found 6 models, 56 data tests, 1 seed, 1 source, 479 macros
+17:20:21  
+17:20:21  Concurrency: 4 threads (target='dev')
+17:20:21  
+17:20:21  1 of 1 START seed file reference.seed_taxi_zone ................................ [RUN]
+17:20:21  1 of 1 OK loaded seed file reference.seed_taxi_zone ............................ [INSERT 265 in 0.07s]
+17:20:21  
+17:20:21  Finished running 1 seed in 0 hours 0 minutes and 0.15 seconds (0.15s).
+17:20:21  
+17:20:21  Completed successfully
+17:20:21  
+17:20:21  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1
+
+$ uv run python -m scripts.load_bronze_fixture --all
+batch_1: додано 1437 рядків у bronze.raw_events
+batch_2: додано 1437 рядків у bronze.raw_events
+batch_3: додано 1437 рядків у bronze.raw_events
+batch_4: додано 1434 рядків у bronze.raw_events
+
+$ ./dbt.sh build --selector silver --indirect-selection cautious
+17:20:22  Running with dbt=1.10.23
+17:20:22  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions
+17:20:23  Registered adapter: postgres=1.10.2
+17:20:23  Found 6 models, 56 data tests, 1 seed, 1 source, 479 macros
+17:20:23  
+17:20:23  Concurrency: 4 threads (target='dev')
+17:20:23  
+17:20:23  1 of 25 START sql incremental model silver.events .............................. [RUN]
+17:20:23  1 of 25 OK created sql incremental model silver.events ......................... [SELECT 5447 in 0.10s]
+17:20:23  2 of 25 START test accepted_values_events_event_type__ride_requested__ride_accepted__ride_started__ride_completed__ride_cancelled__payment_captured  [RUN]
+17:20:23  3 of 25 START test accepted_values_events_source__rider_app__driver_app__billing  [RUN]
+17:20:23  4 of 25 START test not_null_events__ingested_at ................................ [RUN]
+17:20:23  5 of 25 START test not_null_events_event_id .................................... [RUN]
+17:20:23  2 of 25 PASS accepted_values_events_event_type__ride_requested__ride_accepted__ride_started__ride_completed__ride_cancelled__payment_captured  [PASS in 0.08s]
+17:20:23  4 of 25 PASS not_null_events__ingested_at ...................................... [PASS in 0.07s]
+17:20:23  3 of 25 PASS accepted_values_events_source__rider_app__driver_app__billing ..... [PASS in 0.08s]
+17:20:23  5 of 25 PASS not_null_events_event_id .......................................... [PASS in 0.07s]
+17:20:23  6 of 25 START test not_null_events_event_type .................................. [RUN]
+17:20:23  7 of 25 START test not_null_events_occurred_at ................................. [RUN]
+17:20:23  8 of 25 START test not_null_events_occurred_date ............................... [RUN]
+17:20:23  9 of 25 START test not_null_events_payload ..................................... [RUN]
+17:20:23  6 of 25 PASS not_null_events_event_type ........................................ [PASS in 0.03s]
+17:20:23  10 of 25 START test not_null_events_ride_id .................................... [RUN]
+17:20:23  7 of 25 PASS not_null_events_occurred_at ....................................... [PASS in 0.03s]
+17:20:23  8 of 25 PASS not_null_events_occurred_date ..................................... [PASS in 0.03s]
+17:20:23  11 of 25 START test unique_events_event_id ..................................... [RUN]
+17:20:23  9 of 25 PASS not_null_events_payload ........................................... [PASS in 0.03s]
+17:20:23  10 of 25 PASS not_null_events_ride_id .......................................... [PASS in 0.02s]
+17:20:23  11 of 25 PASS unique_events_event_id ........................................... [PASS in 0.02s]
+17:20:23  12 of 25 START sql incremental model silver.rides .............................. [RUN]
+17:20:25  12 of 25 OK created sql incremental model silver.rides ......................... [SELECT 1171 in 1.58s]
+17:20:25  13 of 25 START test accepted_values_rides_payment_method__card__cash__wallet ... [RUN]
+17:20:25  14 of 25 START test accepted_values_rides_status__requested__accepted__in_progress__completed__cancelled  [RUN]
+17:20:25  15 of 25 START test assert_fare_total_consistent ............................... [RUN]
+17:20:25  16 of 25 START test assert_no_test_traffic ..................................... [RUN]
+17:20:25  13 of 25 PASS accepted_values_rides_payment_method__card__cash__wallet ......... [PASS in 0.03s]
+17:20:25  14 of 25 PASS accepted_values_rides_status__requested__accepted__in_progress__completed__cancelled  [PASS in 0.03s]
+17:20:25  17 of 25 START test assert_ride_lifecycle_consistent ........................... [RUN]
+17:20:25  18 of 25 START test assert_rides_match_events .................................. [RUN]
+17:20:25  15 of 25 PASS assert_fare_total_consistent ..................................... [PASS in 0.03s]
+17:20:25  16 of 25 PASS assert_no_test_traffic ........................................... [PASS in 0.03s]
+17:20:25  19 of 25 START test assert_rides_zones_follow_actual_rule ...................... [RUN]
+17:20:25  20 of 25 START test assert_tip_null_only_for_cash .............................. [RUN]
+17:20:25  17 of 25 PASS assert_ride_lifecycle_consistent ................................. [PASS in 0.02s]
+17:20:25  21 of 25 START test not_null_rides__ingested_at ................................ [RUN]
+17:20:25  18 of 25 PASS assert_rides_match_events ........................................ [PASS in 0.03s]
+17:20:25  22 of 25 START test not_null_rides_requested_at ................................ [RUN]
+17:20:25  20 of 25 FAIL 217 assert_tip_null_only_for_cash ................................ [FAIL 217 in 0.03s]
+17:20:25  19 of 25 PASS assert_rides_zones_follow_actual_rule ............................ [PASS in 0.03s]
+17:20:25  23 of 25 START test not_null_rides_ride_id ..................................... [RUN]
+17:20:25  24 of 25 START test not_null_rides_status ...................................... [RUN]
+17:20:25  21 of 25 PASS not_null_rides__ingested_at ...................................... [PASS in 0.02s]
+17:20:25  25 of 25 START test unique_rides_ride_id ....................................... [RUN]
+17:20:25  22 of 25 PASS not_null_rides_requested_at ...................................... [PASS in 0.03s]
+17:20:25  23 of 25 PASS not_null_rides_ride_id ........................................... [PASS in 0.03s]
+17:20:25  24 of 25 PASS not_null_rides_status ............................................ [PASS in 0.02s]
+17:20:25  25 of 25 PASS unique_rides_ride_id ............................................. [PASS in 0.02s]
+17:20:25  
+17:20:25  Finished running 2 incremental models, 23 data tests in 0 hours 0 minutes and 2.00 seconds (2.00s).
+17:20:25  
+17:20:25  Completed with 1 error, 0 partial successes, and 0 warnings:
+17:20:25  
+17:20:25  Failure in test assert_tip_null_only_for_cash (tests/assert_tip_null_only_for_cash.sql)
+17:20:25    Got 217 results, configured to fail if != 0
+17:20:25  
+17:20:25    compiled code at /tmp/fp-dbt-target/compiled/rides/tests/assert_tip_null_only_for_cash.sql
+17:20:25  
+17:20:25  Done. PASS=24 WARN=0 ERROR=1 SKIP=0 NO-OP=0 TOTAL=25
+
+$ ./dbt.sh build --selector gold --indirect-selection cautious
+17:20:26  Running with dbt=1.10.23
+17:20:26  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions
+17:20:26  Registered adapter: postgres=1.10.2
+17:20:26  Found 6 models, 56 data tests, 1 seed, 1 source, 479 macros
+17:20:26  
+17:20:26  Concurrency: 4 threads (target='dev')
+17:20:26  
+17:20:27  1 of 29 START sql incremental model gold.dim_driver ............................ [RUN]
+17:20:27  2 of 29 START seed file reference.seed_taxi_zone ............................... [RUN]
+17:20:27  1 of 29 OK created sql incremental model gold.dim_driver ....................... [SELECT 81 in 0.14s]
+17:20:27  3 of 29 START test not_null_dim_driver_driver_key .............................. [RUN]
+17:20:27  4 of 29 START test not_null_dim_driver_vehicle_type ............................ [RUN]
+17:20:27  5 of 29 START test unique_dim_driver_driver_key ................................ [RUN]
+17:20:27  2 of 29 OK loaded seed file reference.seed_taxi_zone ........................... [INSERT 265 in 0.15s]
+17:20:27  6 of 29 START sql table model gold.dim_zone .................................... [RUN]
+17:20:27  3 of 29 PASS not_null_dim_driver_driver_key .................................... [PASS in 0.04s]
+17:20:27  5 of 29 PASS unique_dim_driver_driver_key ...................................... [PASS in 0.04s]
+17:20:27  4 of 29 PASS not_null_dim_driver_vehicle_type .................................. [PASS in 0.05s]
+17:20:27  6 of 29 OK created sql table model gold.dim_zone ............................... [SELECT 266 in 0.03s]
+17:20:27  7 of 29 START test not_null_dim_zone_borough ................................... [RUN]
+17:20:27  8 of 29 START test not_null_dim_zone_zone_key .................................. [RUN]
+17:20:27  9 of 29 START test unique_dim_zone_zone_key .................................... [RUN]
+17:20:27  7 of 29 PASS not_null_dim_zone_borough ......................................... [PASS in 0.02s]
+17:20:27  9 of 29 PASS unique_dim_zone_zone_key .......................................... [PASS in 0.02s]
+17:20:27  8 of 29 PASS not_null_dim_zone_zone_key ........................................ [PASS in 0.02s]
+17:20:27  10 of 29 START sql incremental model gold.fact_ride ............................ [RUN]
+17:20:27  10 of 29 OK created sql incremental model gold.fact_ride ....................... [SELECT 1171 in 0.04s]
+17:20:27  11 of 29 START test accepted_values_fact_ride_status__requested__accepted__in_progress__completed__cancelled  [RUN]
+17:20:27  12 of 29 START test assert_payment_matches_fare ................................ [RUN]
+17:20:27  13 of 29 START test not_null_fact_ride_driver_key .............................. [RUN]
+17:20:27  14 of 29 START test not_null_fact_ride_dropoff_zone_key ........................ [RUN]
+17:20:27  12 of 29 PASS assert_payment_matches_fare ...................................... [PASS in 0.02s]
+17:20:27  15 of 29 START test not_null_fact_ride_pickup_zone_key ......................... [RUN]
+17:20:27  13 of 29 PASS not_null_fact_ride_driver_key .................................... [PASS in 0.02s]
+17:20:27  16 of 29 START test not_null_fact_ride_requested_date .......................... [RUN]
+17:20:27  14 of 29 PASS not_null_fact_ride_dropoff_zone_key .............................. [PASS in 0.02s]
+17:20:27  17 of 29 START test not_null_fact_ride_requested_hour .......................... [RUN]
+17:20:27  11 of 29 PASS accepted_values_fact_ride_status__requested__accepted__in_progress__completed__cancelled  [PASS in 0.04s]
+17:20:27  18 of 29 START test not_null_fact_ride_ride_id ................................. [RUN]
+17:20:27  15 of 29 PASS not_null_fact_ride_pickup_zone_key ............................... [PASS in 0.03s]
+17:20:27  19 of 29 START test relationships_fact_ride_driver_key__driver_key__ref_dim_driver_  [RUN]
+17:20:27  16 of 29 PASS not_null_fact_ride_requested_date ................................ [PASS in 0.02s]
+17:20:27  20 of 29 START test relationships_fact_ride_dropoff_zone_key__zone_key__ref_dim_zone_  [RUN]
+17:20:27  18 of 29 PASS not_null_fact_ride_ride_id ....................................... [PASS in 0.02s]
+17:20:27  21 of 29 START test relationships_fact_ride_pickup_zone_key__zone_key__ref_dim_zone_  [RUN]
+17:20:27  17 of 29 PASS not_null_fact_ride_requested_hour ................................ [PASS in 0.03s]
+17:20:27  22 of 29 START test unique_fact_ride_ride_id ................................... [RUN]
+17:20:27  19 of 29 PASS relationships_fact_ride_driver_key__driver_key__ref_dim_driver_ .. [PASS in 0.03s]
+17:20:27  20 of 29 PASS relationships_fact_ride_dropoff_zone_key__zone_key__ref_dim_zone_  [PASS in 0.03s]
+17:20:27  21 of 29 PASS relationships_fact_ride_pickup_zone_key__zone_key__ref_dim_zone_ . [PASS in 0.02s]
+17:20:27  22 of 29 PASS unique_fact_ride_ride_id ......................................... [PASS in 0.01s]
+17:20:27  23 of 29 START sql incremental model gold.agg_zone_hourly ...................... [RUN]
+17:20:27  23 of 29 OK created sql incremental model gold.agg_zone_hourly ................. [SELECT 351 in 0.02s]
+17:20:27  24 of 29 START test assert_agg_grain_unique .................................... [RUN]
+17:20:27  25 of 29 START test assert_agg_matches_fact .................................... [RUN]
+17:20:27  26 of 29 START test not_null_agg_zone_hourly_pickup_zone_key ................... [RUN]
+17:20:27  27 of 29 START test not_null_agg_zone_hourly_requested_hour .................... [RUN]
+17:20:27  27 of 29 PASS not_null_agg_zone_hourly_requested_hour .......................... [PASS in 0.02s]
+17:20:27  28 of 29 START test not_null_agg_zone_hourly_rides_requested ................... [RUN]
+17:20:27  24 of 29 PASS assert_agg_grain_unique .......................................... [PASS in 0.03s]
+17:20:27  29 of 29 START test relationships_agg_zone_hourly_pickup_zone_key__zone_key__ref_dim_zone_  [RUN]
+17:20:27  25 of 29 PASS assert_agg_matches_fact .......................................... [PASS in 0.03s]
+17:20:27  26 of 29 PASS not_null_agg_zone_hourly_pickup_zone_key ......................... [PASS in 0.03s]
+17:20:27  28 of 29 PASS not_null_agg_zone_hourly_rides_requested ......................... [PASS in 0.02s]
+17:20:27  29 of 29 PASS relationships_agg_zone_hourly_pickup_zone_key__zone_key__ref_dim_zone_  [PASS in 0.02s]
+17:20:27  
+17:20:27  Finished running 3 incremental models, 1 seed, 1 table model, 24 data tests in 0 hours 0 minutes and 0.52 seconds (0.52s).
+17:20:27  
+17:20:27  Completed successfully
+17:20:27  
+17:20:27  Done. PASS=29 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=29
+
+$ ./dbt.sh test --selector reconcile
+17:20:28  Running with dbt=1.10.23
+17:20:28  This version of dbt is deprecated and no longer receives regular patches, including for known bugs. We recommend upgrading to a newer supported version of dbt: https://docs.getdbt.com/docs/dbt-versions
+17:20:29  Registered adapter: postgres=1.10.2
+17:20:29  Found 6 models, 56 data tests, 1 seed, 1 source, 479 macros
+17:20:29  
+17:20:29  Concurrency: 4 threads (target='dev')
+17:20:29  
+17:20:29  1 of 4 START test assert_bronze_silver_reconcile ............................... [RUN]
+17:20:29  2 of 4 START test assert_dates_are_utc ......................................... [RUN]
+17:20:29  3 of 4 START test assert_driver_attributes_are_latest .......................... [RUN]
+17:20:29  4 of 4 START test assert_fact_ride_matches_silver_rides ........................ [RUN]
+17:20:29  4 of 4 PASS assert_fact_ride_matches_silver_rides .............................. [PASS in 0.04s]
+17:20:29  2 of 4 PASS assert_dates_are_utc ............................................... [PASS in 0.05s]
+17:20:29  3 of 4 PASS assert_driver_attributes_are_latest ................................ [PASS in 0.04s]
+17:20:29  1 of 4 PASS assert_bronze_silver_reconcile ..................................... [PASS in 0.05s]
+17:20:29  
+17:20:29  Finished running 4 data tests in 0 hours 0 minutes and 0.11 seconds (0.11s).
+17:20:29  
+17:20:29  Completed successfully
+17:20:29  
+17:20:29  Done. PASS=4 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=4

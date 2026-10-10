@@ -5,28 +5,78 @@
 --          closed_at, merged_at, additions, deletions, changed_files, commits_count, comments,
 --          review_comments, author_association, label_names, last_action, last_event_at, churn, hours_open
 
--- TODO: замініть заглушку на запит згідно зі SPEC.md
-select
-    cast(null as string)          as repo_name,
-    cast(null as int)             as pr_number,
-    cast(null as string)          as title,
-    cast(null as string)          as author_login,
-    cast(null as string)          as state,
-    cast(null as boolean)         as is_merged,
-    cast(null as boolean)         as is_draft,
-    cast(null as timestamp)       as opened_at,
-    cast(null as timestamp)       as closed_at,
-    cast(null as timestamp)       as merged_at,
-    cast(null as int)             as additions,
-    cast(null as int)             as deletions,
-    cast(null as int)             as changed_files,
-    cast(null as int)             as commits_count,
-    cast(null as int)             as comments,
-    cast(null as int)             as review_comments,
-    cast(null as string)          as author_association,
-    cast(null as array<string>)   as label_names,
-    cast(null as string)          as last_action,
-    cast(null as timestamp)       as last_event_at,
-    cast(null as int)             as churn,
-    cast(null as double)          as hours_open
-where false
+WITH pr_events AS (
+    SELECT
+        event_id,
+        repo_name,
+        created_at AS event_at,
+        from_json(payload, '{{ var("pr_schema") }}') AS parsed
+    FROM {{ ref('events') }}
+    WHERE event_type = 'PullRequestEvent'
+),
+
+flattened AS (
+    SELECT
+        event_id,
+        repo_name,
+        event_at,
+        parsed.action                              AS last_action,
+        parsed.number                              AS pr_number,
+        parsed.pull_request.title                  AS title,
+        parsed.pull_request.user.login             AS author_login,
+        parsed.pull_request.state                  AS state,
+        parsed.pull_request.merged                 AS is_merged,
+        parsed.pull_request.draft                  AS is_draft,
+        to_timestamp(parsed.pull_request.created_at) AS opened_at,
+        to_timestamp(parsed.pull_request.closed_at)  AS closed_at,
+        to_timestamp(parsed.pull_request.merged_at)  AS merged_at,
+        parsed.pull_request.additions              AS additions,
+        parsed.pull_request.deletions               AS deletions,
+        parsed.pull_request.changed_files          AS changed_files,
+        parsed.pull_request.commits                AS commits_count,
+        parsed.pull_request.comments               AS comments,
+        parsed.pull_request.review_comments        AS review_comments,
+        parsed.pull_request.author_association     AS author_association,
+        transform(parsed.pull_request.labels, l -> l.name) AS label_names
+    FROM pr_events
+),
+
+ranked AS (
+    SELECT *,
+        row_number() OVER (
+            PARTITION BY repo_name, pr_number
+            ORDER BY event_at DESC, event_id DESC
+        ) AS rn
+    FROM flattened
+),
+
+deduped AS (
+    SELECT *
+    FROM ranked
+    WHERE rn = 1
+)
+
+SELECT
+    repo_name,
+    pr_number,
+    title,
+    author_login,
+    state,
+    is_merged,
+    is_draft,
+    opened_at,
+    closed_at,
+    merged_at,
+    additions,
+    deletions,
+    changed_files,
+    commits_count,
+    comments,
+    review_comments,
+    author_association,
+    label_names,
+    last_action,
+    event_at AS last_event_at,
+    additions + deletions AS churn,
+    (unix_timestamp(coalesce(closed_at, event_at)) - unix_timestamp(opened_at)) / 3600.0 AS hours_open
+FROM deduped

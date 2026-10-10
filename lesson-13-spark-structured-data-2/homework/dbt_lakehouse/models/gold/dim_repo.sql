@@ -4,12 +4,13 @@
 --          event_count, is_forked (є хоч одна подія ForkEvent по цьому репо).
 
 -- TODO: замініть заглушку на запит згідно зі SPEC.md
-select
-    cast(null as string)    as repo_id,
-    cast(null as string)    as repo_name,
-    cast(null as string)    as repo_owner,
-    cast(null as timestamp) as first_seen_at,
-    cast(null as timestamp) as last_seen_at,
-    cast(null as bigint)    as event_count,
-    cast(null as boolean)   as is_forked
-where false
+SELECT
+    md5(repo_name)                                              AS repo_id,
+    repo_name,
+    repo_owner,
+    min(created_at)                                             AS first_seen_at,
+    max(created_at)                                             AS last_seen_at,
+    count(*)                                                    AS event_count,
+    bool_or(event_type = 'ForkEvent')                           AS is_forked
+FROM {{ ref('events') }}
+GROUP BY repo_name, repo_owner
